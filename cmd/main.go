@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/letusgogo/playable-backend/internal"
 	"github.com/letusgogo/quick/app"
 	"github.com/letusgogo/quick/logger"
 	"github.com/sirupsen/logrus"
@@ -25,7 +26,10 @@ func main() {
 			},
 		}),
 		// Set environment variable prefix
-		app.WithEnvPrefix("APP"), // APP_SERVER_PORT → server.port
+		app.WithEnvPrefix("APP"), // APP_SERVER_ADDRESS → server.address
+		app.WithEnvBindings(map[string]string{
+			"custom.api.key": "MY_CUSTOM_API_KEY", // Custom mapping example
+		}),
 	)
 
 	if err := myApp.Start(); err != nil {
@@ -35,13 +39,31 @@ func main() {
 
 func runServer(c *cli.Context, myApp *app.App) error {
 	log := logger.GetLogger("server")
-	log.Info("Starting server")
+	address := myApp.Config().GetString("server.address")
+
+	log.Infof("Starting server on %s", address)
+
+	apiService := internal.NewApiService(internal.ApiServiceConfig{
+		Address: address,
+	})
+
+	err := apiService.Init()
+	if err != nil {
+		log.Errorf("Failed to initialize API service: %v", err)
+		return err
+	}
+
+	err = apiService.Start()
+	if err != nil {
+		log.Errorf("Failed to start API service: %v", err)
+		return err
+	}
+
 	// Wait for shutdown signal
 	app.WaitForSignal(func(s os.Signal) {
 		log.Infof("Received signal %v, shutting down HTTP server gracefully", s)
-		// Here you would normally stop your HTTP server
-		time.Sleep(1 * time.Second) // Simulate graceful shutdown
-		log.Info("HTTP server stopped")
+		err := apiService.StopGracefully(1 * time.Second)
+		log.Info("API server stopped, error: ", err)
 	})
 	return nil
 }
