@@ -4,7 +4,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/letusgogo/playable-backend/internal"
+	"github.com/letusgogo/playable-backend/internal/anbox"
+	"github.com/letusgogo/playable-backend/internal/api"
+	"github.com/letusgogo/playable-backend/internal/game"
+	"github.com/letusgogo/playable-backend/internal/session"
 	"github.com/letusgogo/quick/app"
 	"github.com/letusgogo/quick/logger"
 	"github.com/sirupsen/logrus"
@@ -41,13 +44,47 @@ func runServer(c *cli.Context, myApp *app.App) error {
 	log := logger.GetLogger("server")
 	address := myApp.Config().GetString("server.address")
 
-	log.Infof("Starting server on %s", address)
+	// game manager
+	var gamesList []*game.Game
+	err := myApp.Config().UnmarshalKey("games", &gamesList)
+	if err != nil {
+		log.Errorf("Failed to unmarshal game config: %v", err)
+		return err
+	}
 
-	apiService := internal.NewApiService(internal.ApiServiceConfig{
+	// Convert list to map for easier access
+	games := make(map[string]*game.Game)
+	for _, game := range gamesList {
+		games[game.Name] = game
+	}
+
+	log.Infof("Loaded %d games from config", len(games))
+
+	gameManager := game.NewManager(games)
+
+	// anbox gateway client
+	var anboxGatewayConfig anbox.GatewayConfig
+
+	// Try different unmarshaling approaches
+	err = myApp.Config().UnmarshalKey("anbox", &anboxGatewayConfig)
+	if err != nil {
+		log.Errorf("Failed to unmarshal anbox gateway config: %v", err)
+		return err
+	}
+
+	log.Infof("Unmarshaled config - Address: %s, Token: %s", anboxGatewayConfig.Address, anboxGatewayConfig.Token)
+
+	// Try manual assignment as fallback
+	anboxGatewayClient := anbox.NewGatewayClient(anboxGatewayConfig)
+
+	// session manager
+	sessionManager := session.NewCacheSessionManager(gameManager, anboxGatewayClient)
+
+	apiService := api.NewApiService(api.ApiServiceConfig{
 		Address: address,
-	})
+	}, sessionManager)
 
-	err := apiService.Init()
+	err = apiService.Init()
 	if err != nil {
 		log.Errorf("Failed to initialize API service: %v", err)
 		return err
@@ -57,6 +94,8 @@ func runServer(c *cli.Context, myApp *app.App) error {
 	if err != nil {
 		log.Errorf("Failed to start API service: %v", err)
 		return err
+	} else {
+		log.Infof("Starting server on %s", address)
 	}
 
 	// Wait for shutdown signal

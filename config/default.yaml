@@ -1,0 +1,45 @@
+server:
+  address: "0.0.0.0:2222"
+  debug: true
+
+anbox:
+  address: "https://dev.android.gateway.gamingnow.co:4000"
+  token: "AgEUYW5ib3gtc3RyZWFtLWdhdGV3YXkCCmRldi1jbGllbnQAAhQyMDI1LTA3LTI0VDAyOjIwOjM4WgACFDIwMjYtMDctMjRUMDI6MjA6MzhaAAAGIPLA63vBcqpWlVfGPkC6_GFIipnLtN7HHVTEZ1nadfvb"
+  ams_address: "44.252.106.102:8444"
+
+games:
+  - name: idle_weapon
+    session_config:
+      min: 1
+      max: 10
+      screen_config:
+        width: 1920
+        height: 1080
+        density: 320
+        fps: 30
+    runtime:
+      time_over: 3m
+      over_url: "https://www.baidu.com"
+    stages:
+      - number: 1
+        interval: 2
+        area:
+          clue: "upgrade"
+          x: 0.15
+          y: 0.09
+          width: 0.7
+          height: 0.08
+        reco:
+          method: "ocrAny"
+          matchs: ["Update", "level to"]
+      - number: 2
+        interval: 1
+        area:
+          clue: "level"
+          x: 0.15
+          y: 0.09
+          width: 0.7
+          height: 0.08
+        reco:
+          method: "recoAnd"
+          matchs: ["level", "升级"]
