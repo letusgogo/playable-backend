@@ -13,8 +13,8 @@ games:
       min: 1
       max: 10
       screen_config:
-        width: 1920
-        height: 1080
+        width: 720
+        height: 1240
         density: 320
         fps: 30
     runtime:
