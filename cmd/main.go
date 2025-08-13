@@ -7,7 +7,6 @@ import (
 	"github.com/letusgogo/playable-backend/internal/anbox"
 	"github.com/letusgogo/playable-backend/internal/api"
 	"github.com/letusgogo/playable-backend/internal/game"
-	"github.com/letusgogo/playable-backend/internal/session"
 	"github.com/letusgogo/quick/app"
 	"github.com/letusgogo/quick/logger"
 	"github.com/sirupsen/logrus"
@@ -44,45 +43,38 @@ func runServer(c *cli.Context, myApp *app.App) error {
 	log := logger.GetLogger("server")
 	address := myApp.Config().GetString("server.address")
 
-	// game manager
-	var gamesList []*game.Game
-	err := myApp.Config().UnmarshalKey("games", &gamesList)
-	if err != nil {
-		log.Errorf("Failed to unmarshal game config: %v", err)
-		return err
-	}
-
-	// Convert list to map for easier access
-	games := make(map[string]*game.Game)
-	for _, game := range gamesList {
-		games[game.Name] = game
-	}
-
-	log.Infof("Loaded %d games from config", len(games))
-
-	gameManager := game.NewManager(games)
-
 	// anbox gateway client
-	var anboxGatewayConfig anbox.GatewayConfig
-
-	// Try different unmarshaling approaches
-	err = myApp.Config().UnmarshalKey("anbox", &anboxGatewayConfig)
+	var anboxConfig anbox.AnboxConfig
+	err := myApp.Config().UnmarshalKey("anbox", &anboxConfig)
 	if err != nil {
 		log.Errorf("Failed to unmarshal anbox gateway config: %v", err)
 		return err
 	}
 
-	log.Infof("Unmarshaled config - Address: %s, Token: %s", anboxGatewayConfig.Address, anboxGatewayConfig.Token)
+	anboxClient, err := anbox.NewClient(anboxConfig)
+	if err != nil {
+		log.Errorf("Failed to create anbox client: %v", err)
+		return err
+	}
 
-	// Try manual assignment as fallback
-	anboxGatewayClient := anbox.NewGatewayClient(anboxGatewayConfig)
+	// game manager
+	var gamesList []*game.Game
+	err = myApp.Config().UnmarshalKey("games", &gamesList)
+	if err != nil {
+		log.Errorf("Failed to unmarshal game config: %v", err)
+		return err
+	}
 
-	// session manager
-	sessionManager := session.NewCacheSessionManager(gameManager, anboxGatewayClient)
+	gameManager := game.NewManager(gamesList, anboxClient)
+	gameManager.Init(c.Context)
+	gameManager.Start(c.Context)
+	defer func() {
+		gameManager.Stop(c.Context)
+	}()
 
 	apiService := api.NewApiService(api.ApiServiceConfig{
 		Address: address,
-	}, sessionManager)
+	}, gameManager)
 
 	err = apiService.Init()
 	if err != nil {
@@ -104,5 +96,6 @@ func runServer(c *cli.Context, myApp *app.App) error {
 		err := apiService.StopGracefully(1 * time.Second)
 		log.Info("API server stopped, error: ", err)
 	})
+
 	return nil
 }

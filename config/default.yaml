@@ -5,13 +5,18 @@ server:
 anbox:
   address: "https://dev.android.gateway.gamingnow.co:4000"
   token: "AgEUYW5ib3gtc3RyZWFtLWdhdGV3YXkCCmRldi1jbGllbnQAAhQyMDI1LTA3LTI0VDAyOjIwOjM4WgACFDIwMjYtMDctMjRUMDI6MjA6MzhaAAAGIPLA63vBcqpWlVfGPkC6_GFIipnLtN7HHVTEZ1nadfvb"
-  ams_address: "44.252.106.102:8444"
+  ams_cert: "./certs/ams_dev.crt"
+  ams_key: "./certs/ams_dev.key"
+  ams_address: "https://44.252.106.102:8444"
 
 games:
   - name: idle_weapon
     session_config:
-      min: 1
-      max: 10
+      min: 5                          # Minimum sessions to maintain
+      max: 10                         # Maximum total sessions allowed
+      session_ttl: 5m                 # Session TTL when in use
+      heartbeat_timeout: 1m           # Time before session considered dead
+      sync_interval: 10s              # How often to sync running sessions from AMS
       screen_config:
         width: 720
         height: 1240

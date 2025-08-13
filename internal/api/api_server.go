@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/letusgogo/playable-backend/internal/session"
+	"github.com/letusgogo/playable-backend/internal/game"
 	"github.com/letusgogo/quick/logger"
 	"github.com/letusgogo/quick/utils"
 )
@@ -28,17 +28,17 @@ type ApiService struct {
 	config    ApiServiceConfig
 	ginServer *utils.GinService
 	// context for graceful shutdown
-	ctx            context.Context
-	cancel         context.CancelFunc
-	sessionManager session.SessionManager
+	ctx         context.Context
+	cancel      context.CancelFunc
+	gameManager *game.Manager
 }
 
-func NewApiService(config ApiServiceConfig, sessionManager session.SessionManager) *ApiService {
+func NewApiService(config ApiServiceConfig, gameManager *game.Manager) *ApiService {
 	return &ApiService{
-		name:           "apiService",
-		config:         config,
-		ginServer:      utils.NewGinServer(config.Address),
-		sessionManager: sessionManager,
+		name:        "apiService",
+		config:      config,
+		ginServer:   utils.NewGinServer(config.Address),
+		gameManager: gameManager,
 	}
 }
 
@@ -59,28 +59,123 @@ func (a *ApiService) Init() error {
 func (a *ApiService) setupRoutes() {
 	// Apply CORS middleware to the entire Gin engine
 	a.ginServer.GinEngine().Use(cors.Default())
-
-	a.ginServer.GinGroup("/api/v1").GET("/health", func(c *gin.Context) {
+	v1 := a.ginServer.GinGroup("/api/v1")
+	v1.GET("/health", func(c *gin.Context) {
 		logger.GetLogger("apiService").Info("health check")
 		c.JSON(http.StatusOK, gin.H{"message": "ok"})
 	})
 
-	a.ginServer.GinGroup("/api/v1/sessions").POST("/get", func(c *gin.Context) {
-		req := CreateSessionRequest{}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		session, err := a.sessionManager.GetAndSet(c.Request.Context(), req.Game, session.SessInUse)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, CommonResponse{
-			Code:    ErrNot,
-			Message: "success",
-			Data:    session,
+	gameGroup := v1.Group("/games")
+	{
+		gameGroup.GET("/:game", a.getGameInstance)
+		gameGroup.GET("/:game/sessions", a.getGameInstanceSessions)
+
+		// Session management endpoints - simplified
+		gameGroup.POST("/:game/acquire_cold", a.acquireColdSession)
+		gameGroup.POST("/:game/set_warmed", a.setSessionWarmed)
+		gameGroup.POST("/:game/acquire_warmed", a.acquireWarmedSession)
+		gameGroup.POST("/:game/release", a.releaseSession)
+
+		gameGroup.POST("/:game/detect", a.detectStage)
+	}
+}
+
+func (a *ApiService) detectStage(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
 		})
+		return
+	}
+
+	var req DetectStageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, CommonResponse{
+			Code:    400,
+			Message: "invalid request body",
+			Data:    nil,
+		})
+		return
+	}
+
+	stageDetector := gameInstance.GetStageDetector(req.CurrentStageNum)
+	match, evidence, err := stageDetector.Detect(c.Request.Context(), game, req.CurrentStageNum, req.Image)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	response := DetectStageResponse{
+		Match:    match,
+		StageNum: req.CurrentStageNum,
+		Evidence: evidence,
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    response,
+	})
+}
+
+func (a *ApiService) getGameInstance(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"error": "game not found"})
+		return
+	}
+	status, err := gameInstance.GetInstanceStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    status,
+	})
+}
+
+func (a *ApiService) getGameInstanceSessions(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Get pool status instead of listing sessions
+	poolStatus, err := gameInstance.GetSessionManager().PoolStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    poolStatus,
 	})
 }
 
@@ -106,4 +201,144 @@ func (a *ApiService) StopGracefully(wait time.Duration) error {
 
 	// Stop gin server
 	return a.ginServer.Stop(wait)
+}
+
+// acquireColdSession 获取 cold session
+func (a *ApiService) acquireColdSession(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	session, err := gameInstance.GetSessionManager().AcquireCold(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    session,
+	})
+}
+
+// setSessionWarmed 设置 session 为 warmed 状态
+func (a *ApiService) setSessionWarmed(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	var req SetWarmedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, CommonResponse{
+			Code:    400,
+			Message: "invalid request body",
+			Data:    nil,
+		})
+		return
+	}
+
+	err := gameInstance.GetSessionManager().SetWarmed(c.Request.Context(), req.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    nil,
+	})
+}
+
+// acquireWarmedSession 获取 warmed session
+func (a *ApiService) acquireWarmedSession(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	session, err := gameInstance.GetSessionManager().AcquireWarmed(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    session,
+	})
+}
+
+// releaseSession 删除 session
+func (a *ApiService) releaseSession(c *gin.Context) {
+	game := c.Param("game")
+	gameInstance, ok := a.gameManager.GetGameInstance(c.Request.Context(), game)
+	if !ok {
+		c.JSON(http.StatusNotFound, CommonResponse{
+			Code:    404,
+			Message: "game not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	var req ReleaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, CommonResponse{
+			Code:    400,
+			Message: "invalid request body",
+			Data:    nil,
+		})
+		return
+	}
+
+	err := gameInstance.GetSessionManager().Release(c.Request.Context(), req.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, CommonResponse{
+			Code:    500,
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, CommonResponse{
+		Code:    ErrNot,
+		Message: "success",
+		Data:    nil,
+	})
 }

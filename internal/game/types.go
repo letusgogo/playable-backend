@@ -2,6 +2,8 @@ package game
 
 import (
 	"time"
+
+	"github.com/letusgogo/playable-backend/internal/session"
 )
 
 type Config struct {
@@ -22,10 +24,10 @@ type Anbox struct {
 }
 
 type Game struct {
-	Name          string        `mapstructure:"name"`
-	SessionConfig SessionConfig `mapstructure:"session_config"`
-	Runtime       Runtime       `mapstructure:"runtime"`
-	Stages        []Stage       `mapstructure:"stages"`
+	Name          string         `mapstructure:"name"`
+	SessionConfig *SessionConfig `mapstructure:"session_config"`
+	Runtime       *Runtime       `mapstructure:"runtime"`
+	Stages        []*Stage       `mapstructure:"stages"`
 }
 
 type SessionConfig struct {
@@ -64,4 +66,13 @@ type Stage struct {
 	Interval time.Duration `mapstructure:"interval"`
 	Area     Area          `mapstructure:"area"`
 	Reco     Reco          `mapstructure:"reco"`
+}
+
+// GameInstanceStatus represents the status of a game instance
+type GameInstanceStatus struct {
+	Name        string              `json:"name"`
+	Initialized bool                `json:"initialized"`
+	Running     bool                `json:"running"`
+	PoolStatus  *session.PoolStatus `json:"pool_status,omitempty"`
+	Config      *Game               `json:"config,omitempty"`
 }

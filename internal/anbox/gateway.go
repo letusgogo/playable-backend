@@ -11,11 +11,11 @@ import (
 )
 
 type GatewayClient struct {
-	config GatewayConfig
+	config AnboxConfig
 	client *http.Client
 }
 
-func NewGatewayClient(config GatewayConfig) *GatewayClient {
+func NewGatewayClient(config AnboxConfig) *GatewayClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -68,6 +68,37 @@ func (c *GatewayClient) Create(ctx context.Context, req CreateSessionRequest) (*
 	}
 
 	return &result.Metadata, nil
+}
+
+// CreateAsync creates a new Anbox streaming session asynchronously
+func (c *GatewayClient) CreateAsync(ctx context.Context, req CreateSessionRequest) error {
+	url := fmt.Sprintf("%s/1.0/sessions?api_token=%s", c.config.Address, c.config.Token)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := c.client.Do(request)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(response.Body)
+		return fmt.Errorf("unexpected status code: %d, body: %s", response.StatusCode, string(bodyBytes))
+	}
+
+	// We don't return the session details since it's async
+	return nil
 }
 
 // Delete deletes an existing session

@@ -8,9 +8,9 @@ import (
 )
 
 func TestRealGatewayClient(t *testing.T) {
-	client := NewGatewayClient(GatewayConfig{
-		Address:   "https://dev.android.gateway.gamingnow.co:4000",
-		Token: "AgEUYW5ib3gtc3RyZWFtLWdhdGV3YXkCCmRldi1jbGllbnQAAhQyMDI1LTA3LTI0VDAyOjIwOjM4WgACFDIwMjYtMDctMjRUMDI6MjA6MzhaAAAGIPLA63vBcqpWlVfGPkC6_GFIipnLtN7HHVTEZ1nadfvb",
+	client := NewGatewayClient(AnboxConfig{
+		Address: "https://dev.android.gateway.gamingnow.co:4000",
+		Token:   "AgEUYW5ib3gtc3RyZWFtLWdhdGV3YXkCCmRldi1jbGllbnQAAhQyMDI1LTA3LTI0VDAyOjIwOjM4WgACFDIwMjYtMDctMjRUMDI6MjA6MzhaAAAGIPLA63vBcqpWlVfGPkC6_GFIipnLtN7HHVTEZ1nadfvb",
 	})
 	ctx := context.Background()
 	req := CreateSessionRequest{
@@ -35,9 +35,9 @@ func TestRealGatewayClient(t *testing.T) {
 }
 
 func TestNewGatewayClient(t *testing.T) {
-	client := NewGatewayClient(GatewayConfig{
-		Address:   "https://gateway.example.com",
-		Token: "test-token",
+	client := NewGatewayClient(AnboxConfig{
+		Address: "https://gateway.example.com",
+		Token:   "test-token",
 	})
 
 	if client.GetGatewayURL() != "https://gateway.example.com" {
@@ -54,9 +54,9 @@ func TestNewGatewayClient(t *testing.T) {
 }
 
 func TestGetGatewayURL(t *testing.T) {
-	client := NewGatewayClient(GatewayConfig{
-		Address:   "https://gateway.example.com",
-		Token: "test-token",
+	client := NewGatewayClient(AnboxConfig{
+		Address: "https://gateway.example.com",
+		Token:   "test-token",
 	})
 
 	url := client.GetGatewayURL()
@@ -109,9 +109,9 @@ func TestCreateSession_Success(t *testing.T) {
 	t.Logf("Mock server running at: %s", server.URL)
 
 	// Create client with test server URL
-	client := NewGatewayClient(GatewayConfig{
-		Address:   server.URL,
-		Token: "test-token",
+	client := NewGatewayClient(AnboxConfig{
+		Address: server.URL,
+		Token:   "test-token",
 	})
 
 	// Create session request
@@ -178,9 +178,9 @@ func TestDeleteSession_Success(t *testing.T) {
 	defer server.Close()
 
 	// Create client with test server URL
-	client := NewGatewayClient(GatewayConfig{
-		Address:   server.URL,
-		Token: "test-token",
+	client := NewGatewayClient(AnboxConfig{
+		Address: server.URL,
+		Token:   "test-token",
 	})
 
 	// Delete session

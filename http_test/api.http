@@ -2,14 +2,75 @@
 GET http://localhost:1111/api/v1/health
 Content-Type: application/json
 
-### 1. Create Session
-GET http://localhost:1111/api/v1/sessions/create?app=com.tencent.tmgp.sg
+### 2. Get Game Instance Info
+GET http://localhost:1111/api/v1/games/idle_weapon
 Content-Type: application/json
 
-### 2. Get Session
-POST http://localhost:1111/api/v1/sessions/get
+### 3. Get Game Instance Sessions Pool Status
+GET http://localhost:1111/api/v1/games/idle_weapon/sessions
+Content-Type: application/json
+
+### 4. Acquire Cold Session
+POST http://localhost:1111/api/v1/games/idle_weapon/acquire_cold
+Content-Type: application/json
+
+### 5. Set Session to Warmed
+POST http://localhost:1111/api/v1/games/idle_weapon/set_warmed
 Content-Type: application/json
 
 {
-    "game": "idle_weapon"
+    "session_id": "replace_with_actual_session_id"
+}
+
+### 6. Acquire Warmed Session
+POST http://localhost:1111/api/v1/games/idle_weapon/acquire_warmed
+Content-Type: application/json
+
+### 7. Release Session
+POST http://localhost:1111/api/v1/games/idle_weapon/release
+Content-Type: application/json
+
+{
+    "session_id": "replace_with_actual_session_id"
+}
+
+### === 完整的会话生命周期测试 ===
+
+### Step 1: 检查游戏池状态
+GET http://localhost:1111/api/v1/games/idle_weapon/sessions
+Content-Type: application/json
+
+### Step 2: 获取 cold session (cold -> warming)
+POST http://localhost:1111/api/v1/games/idle_weapon/acquire_cold
+Content-Type: application/json
+
+### Step 3: 设置为 warmed 状态 (warming -> warmed)
+# 需要替换 session_id 为上一步返回的 session ID
+POST http://localhost:1111/api/v1/games/idle_weapon/set_warmed
+Content-Type: application/json
+
+{
+    "session_id": "session_12345"
+}
+
+### Step 4: 获取 warmed session (warmed -> in_use)
+POST http://localhost:1111/api/v1/games/idle_weapon/acquire_warmed
+Content-Type: application/json
+
+### Step 5: 释放 session (删除)
+# 需要替换 session_id 为要删除的 session ID
+POST http://localhost:1111/api/v1/games/idle_weapon/release
+Content-Type: application/json
+
+{
+    "session_id": "session_12345"
+}
+
+### 8. Detect Stage
+POST http://localhost:1111/api/v1/games/idle_weapon/detect
+Content-Type: application/json
+
+{
+    "current_stage_num": 1,
+    "image": "https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png"
 }

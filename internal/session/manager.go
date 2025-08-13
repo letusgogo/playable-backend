@@ -2,82 +2,26 @@ package session
 
 import (
 	"context"
-	"fmt"
-	"time"
-
-	"github.com/letusgogo/playable-backend/internal/anbox"
-	"github.com/letusgogo/playable-backend/internal/game"
 )
 
-type Config struct {
-}
+// session  cold -> warming -> warmed -> in use -> delete
+type Manager interface {
+	// Lifecycle management
+	Init(ctx context.Context, cfg *Config) error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
 
-type SessionManager interface {
-	Create(ctx context.Context, gameName string) (*Session, error)
-	Delete(ctx context.Context, gameName, id string) error
-	GetAndSet(ctx context.Context, gameName string, status SessionStatus) (*Session, error)
-}
+	// Session pool management
+	PoolStatus(ctx context.Context) (PoolStatus, error)
 
-type CacheSessionManager struct {
-	cache              map[string]*Session
-	gameManager        *game.Manager
-	anboxGatewayClient *anbox.GatewayClient
-}
+	// State transition methods (State Pattern)
+	AcquireCold(ctx context.Context) (*Session, error)   // Get a cold session and change cold -> warming
+	SetWarmed(ctx context.Context, id string) error      // Change warming -> warmed
+	AcquireWarmed(ctx context.Context) (*Session, error) // Get a warmed session and change warmed -> in_use
+	Release(ctx context.Context, id string) error        // Delete session completely
 
-func NewCacheSessionManager(gameManager *game.Manager, anboxGatewayClient *anbox.GatewayClient) *CacheSessionManager {
-	return &CacheSessionManager{
-		cache:              make(map[string]*Session),
-		gameManager:        gameManager,
-		anboxGatewayClient: anboxGatewayClient,
-	}
-}
-
-func (m *CacheSessionManager) Create(ctx context.Context, gameName string) (*Session, error) {
-	// get the game
-	g, ok := m.gameManager.Get(ctx, gameName)
-	if !ok {
-		return nil, fmt.Errorf("game not found")
-	}
-
-	anboxSession, err := m.anboxGatewayClient.Create(ctx, anbox.CreateSessionRequest{
-		App:         g.Name,
-		Ephemeral:   true,
-		IdleTimeMin: 5,
-		Joinable:    true,
-		Screen: anbox.Screen{
-			Width:   g.SessionConfig.ScreenConfig.Width,
-			Height:  g.SessionConfig.ScreenConfig.Height,
-			Density: g.SessionConfig.ScreenConfig.Density,
-			FPS:     g.SessionConfig.ScreenConfig.Fps,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &Session{
-		ID:            anboxSession.ID,
-		Game:          gameName,
-		GatewayURL:    m.anboxGatewayClient.GetGatewayURL(),
-		AuthToken:     m.anboxGatewayClient.GetAuthToken(),
-		Status:        SessCold,
-		Anbox:         anboxSession,
-		ExpiresAt:     time.Now().Add(time.Minute * 5),
-		LastHeartbeat: time.Now(),
-		CreatedAt:     time.Now(),
-	}, nil
-}
-
-func (m *CacheSessionManager) Delete(ctx context.Context, game, id string) error {
-	return nil
-}
-
-func (m *CacheSessionManager) GetAndSet(ctx context.Context, game string, status SessionStatus) (*Session, error) {
-	// create a new session
-	session, err := m.Create(ctx, game)
-	if err != nil {
-		return nil, err
-	}
-
-	// set the session status
-	return session, nil
+	// Session utilities
+	GetSession(ctx context.Context, id string) (*Session, error)
+	ListSessions(ctx context.Context) ([]*Session, error)
+	Heartbeat(ctx context.Context, id string) error // Prevent session from being deleted due to timeout
 }
