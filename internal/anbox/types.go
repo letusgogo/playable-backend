@@ -1,8 +1,8 @@
 package anbox
 
 type GatewayConfig struct {
-	Address   string `yaml:"address"`
-	Token     string `yaml:"token"`
+	Address string `yaml:"address"`
+	Token   string `yaml:"token"`
 }
 
 // Screen represents the display configuration for a session

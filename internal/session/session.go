@@ -21,6 +21,8 @@ type Session struct {
 	Game          string
 	Status        SessionStatus
 	Anbox         *anbox.SessionDetails
+	GatewayURL    string
+	AuthToken     string
 	ExpiresAt     time.Time // InUse 的业务 TTL
 	LastHeartbeat time.Time
 	CreatedAt     time.Time

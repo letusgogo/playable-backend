@@ -39,10 +39,10 @@ func (m *CacheSessionManager) Create(ctx context.Context, gameName string) (*Ses
 		return nil, fmt.Errorf("game not found")
 	}
 
-	session, err := m.anboxGatewayClient.Create(ctx, anbox.CreateSessionRequest{
+	anboxSession, err := m.anboxGatewayClient.Create(ctx, anbox.CreateSessionRequest{
 		App:         g.Name,
 		Ephemeral:   true,
-		IdleTimeMin: 3,
+		IdleTimeMin: 5,
 		Joinable:    true,
 		Screen: anbox.Screen{
 			Width:   g.SessionConfig.ScreenConfig.Width,
@@ -55,10 +55,13 @@ func (m *CacheSessionManager) Create(ctx context.Context, gameName string) (*Ses
 		return nil, err
 	}
 	return &Session{
-		ID:            session.ID,
-		Status:        SessionStatus(session.Status),
-		Anbox:         session,
-		ExpiresAt:     time.Now().Add(time.Minute * 10),
+		ID:            anboxSession.ID,
+		Game:          gameName,
+		GatewayURL:    m.anboxGatewayClient.GetGatewayURL(),
+		AuthToken:     m.anboxGatewayClient.GetAuthToken(),
+		Status:        SessCold,
+		Anbox:         anboxSession,
+		ExpiresAt:     time.Now().Add(time.Minute * 5),
 		LastHeartbeat: time.Now(),
 		CreatedAt:     time.Now(),
 	}, nil
