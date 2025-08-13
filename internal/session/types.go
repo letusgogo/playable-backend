@@ -41,8 +41,8 @@ func NewConfig() *Config {
 		Min:              5,
 		Max:              10,
 		SessionTTL:       5 * time.Minute,
-		HeartbeatTimeout: 5 * time.Minute,
-		SyncInterval:     30 * time.Second,
+		HeartbeatTimeout: 30 * time.Second,
+		SyncInterval:     10 * time.Second,
 		ScreenConfig: &ScreenConfig{
 			Width:   720,
 			Height:  1240,

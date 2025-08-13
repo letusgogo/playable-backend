@@ -31,3 +31,5 @@ go.work.sum
 # .idea/
 # .vscode/
 __debug*
+.logging/
+cropped_screenshot_*

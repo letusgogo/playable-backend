@@ -23,7 +23,7 @@ type ReleaseRequest struct {
 }
 
 type DetectStageRequest struct {
-	CurrentStageNum int    `json:"current_stage_num"`
+	CurrentStageNum int    `json:"currentStageNum"`
 	Image           string `json:"image"`
 }
 

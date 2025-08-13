@@ -58,7 +58,7 @@ func runServer(c *cli.Context, myApp *app.App) error {
 	}
 
 	// game manager
-	var gamesList []*game.Game
+	var gamesList []*game.GameConfig
 	err = myApp.Config().UnmarshalKey("games", &gamesList)
 	if err != nil {
 		log.Errorf("Failed to unmarshal game config: %v", err)

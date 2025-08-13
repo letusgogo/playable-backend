@@ -3,13 +3,14 @@ package game
 import (
 	"time"
 
+	"github.com/letusgogo/playable-backend/internal/detector"
 	"github.com/letusgogo/playable-backend/internal/session"
 )
 
 type Config struct {
-	Server Server `mapstructure:"server"`
-	Anbox  Anbox  `mapstructure:"anbox"`
-	Games  []Game `mapstructure:"games"`
+	Server Server       `mapstructure:"server"`
+	Anbox  Anbox        `mapstructure:"anbox"`
+	Games  []GameConfig `mapstructure:"games"`
 }
 
 type Server struct {
@@ -23,17 +24,20 @@ type Anbox struct {
 	AMSAddress string `mapstructure:"ams_address"`
 }
 
-type Game struct {
-	Name          string         `mapstructure:"name"`
-	SessionConfig *SessionConfig `mapstructure:"session_config"`
-	Runtime       *Runtime       `mapstructure:"runtime"`
-	Stages        []*Stage       `mapstructure:"stages"`
+type GameConfig struct {
+	Name          string            `mapstructure:"name"`
+	SessionConfig *SessionConfig    `mapstructure:"session_config"`
+	Runtime       *Runtime          `mapstructure:"runtime"`
+	Stages        []*detector.Stage `mapstructure:"stages"`
 }
 
 type SessionConfig struct {
-	Min          int          `mapstructure:"min"`
-	Max          int          `mapstructure:"max"`
-	ScreenConfig ScreenConfig `mapstructure:"screen_config"`
+	Min              int           `mapstructure:"min"`
+	Max              int           `mapstructure:"max"`
+	SessionTTL       time.Duration `mapstructure:"session_ttl"`
+	HeartbeatTimeout time.Duration `mapstructure:"heartbeat_timeout"`
+	SyncInterval     time.Duration `mapstructure:"sync_interval"`
+	ScreenConfig     ScreenConfig  `mapstructure:"screen_config"`
 }
 
 type ScreenConfig struct {
@@ -48,31 +52,11 @@ type Runtime struct {
 	OverURL  string        `mapstructure:"over_url"`
 }
 
-type Area struct {
-	Clue   string  `mapstructure:"clue"`
-	X      float64 `mapstructure:"x"`
-	Y      float64 `mapstructure:"y"`
-	Width  float64 `mapstructure:"width"`
-	Height float64 `mapstructure:"height"`
-}
-
-type Reco struct {
-	Method string   `mapstructure:"method"`
-	Matchs []string `mapstructure:"matchs"`
-}
-
-type Stage struct {
-	Number   int           `mapstructure:"number"`
-	Interval time.Duration `mapstructure:"interval"`
-	Area     Area          `mapstructure:"area"`
-	Reco     Reco          `mapstructure:"reco"`
-}
-
 // GameInstanceStatus represents the status of a game instance
 type GameInstanceStatus struct {
 	Name        string              `json:"name"`
 	Initialized bool                `json:"initialized"`
 	Running     bool                `json:"running"`
 	PoolStatus  *session.PoolStatus `json:"pool_status,omitempty"`
-	Config      *Game               `json:"config,omitempty"`
+	Config      *GameConfig         `json:"config,omitempty"`
 }

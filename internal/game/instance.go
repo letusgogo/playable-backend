@@ -3,14 +3,13 @@ package game
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/letusgogo/playable-backend/internal/detector"
 	"github.com/letusgogo/playable-backend/internal/session"
 )
 
 type GameInstance struct {
-	gameConfig     *Game
+	gameConfig     *GameConfig
 	name           string
 	anboxClient    session.AnboxClient
 	sessionManager session.Manager
@@ -19,7 +18,7 @@ type GameInstance struct {
 }
 
 // NewGameInstance creates a new game instance with the given configuration
-func NewGameInstance(gameConfig *Game, anboxClient session.AnboxClient) *GameInstance {
+func NewGameInstance(gameConfig *GameConfig, anboxClient session.AnboxClient) *GameInstance {
 	return &GameInstance{
 		gameConfig:  gameConfig,
 		name:        gameConfig.Name,
@@ -43,9 +42,9 @@ func (g *GameInstance) Init(ctx context.Context) error {
 	sessionConfig.GameName = g.gameConfig.Name
 	sessionConfig.Min = g.gameConfig.SessionConfig.Min
 	sessionConfig.Max = g.gameConfig.SessionConfig.Max
-	sessionConfig.SessionTTL = g.gameConfig.Runtime.TimeOver
-	sessionConfig.HeartbeatTimeout = 5 * time.Minute
-	sessionConfig.SyncInterval = 30 * time.Second
+	sessionConfig.SessionTTL = g.gameConfig.SessionConfig.SessionTTL
+	sessionConfig.HeartbeatTimeout = g.gameConfig.SessionConfig.HeartbeatTimeout
+	sessionConfig.SyncInterval = g.gameConfig.SessionConfig.SyncInterval
 	sessionConfig.ScreenConfig = &session.ScreenConfig{
 		Width:   g.gameConfig.SessionConfig.ScreenConfig.Width,
 		Height:  g.gameConfig.SessionConfig.ScreenConfig.Height,
@@ -103,7 +102,7 @@ func (g *GameInstance) GetSessionManager() session.Manager {
 }
 
 // GetConfig returns the game configuration
-func (g *GameInstance) GetConfig() *Game {
+func (g *GameInstance) GetConfig() *GameConfig {
 	return g.gameConfig
 }
 
@@ -132,5 +131,11 @@ func (g *GameInstance) GetInstanceStatus(ctx context.Context) (*GameInstanceStat
 }
 
 func (g *GameInstance) GetStageDetector(stageNum int) detector.StageChecker {
-	return detector.NewDefaultOcrDetector()
+	if stageNum == 1 {
+		return detector.NewDefaultOcrDetector(g.gameConfig.Stages)
+	} else if stageNum == 2 {
+		return detector.NewDefaultOcrDetector(g.gameConfig.Stages)
+	} else {
+		return detector.NewDefaultOcrDetector(g.gameConfig.Stages)
+	}
 }

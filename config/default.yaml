@@ -14,8 +14,8 @@ games:
     session_config:
       min: 5                          # Minimum sessions to maintain
       max: 10                         # Maximum total sessions allowed
-      session_ttl: 5m                 # Session TTL when in use
-      heartbeat_timeout: 1m           # Time before session considered dead
+      session_ttl: 4m                 # Session TTL when in use
+      heartbeat_timeout: 30s          # Time before session considered dead
       sync_interval: 10s              # How often to sync running sessions from AMS
       screen_config:
         width: 720

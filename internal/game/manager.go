@@ -16,7 +16,7 @@ type Manager struct {
 	running       bool
 }
 
-func NewManager(gameConfigs []*Game, anboxClient session.AnboxClient) *Manager {
+func NewManager(gameConfigs []*GameConfig, anboxClient session.AnboxClient) *Manager {
 	gameInstances := make(map[string]*GameInstance)
 	for _, g := range gameConfigs {
 		gameInstances[g.Name] = NewGameInstance(g, anboxClient)
@@ -108,11 +108,11 @@ func (m *Manager) GetGameInstance(ctx context.Context, game string) (*GameInstan
 	return g, ok
 }
 
-func (m *Manager) GetAllConfigs(ctx context.Context) []*Game {
+func (m *Manager) GetAllConfigs(ctx context.Context) []*GameConfig {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	games := make([]*Game, 0)
+	games := make([]*GameConfig, 0)
 	for _, g := range m.gameInstances {
 		games = append(games, g.gameConfig)
 	}

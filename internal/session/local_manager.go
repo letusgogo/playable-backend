@@ -320,8 +320,10 @@ func (m *LocalSessionManager) cleanupExpired() {
 		}
 
 		// Check in-use sessions for heartbeat timeout
-		if session.Status == InUse && now.Sub(session.LastHeartbeat) > m.cfg.HeartbeatTimeout {
-			shouldDelete = true
+		if session.Status == InUse || session.Status == Warmed {
+			if now.Sub(session.LastHeartbeat) > m.cfg.HeartbeatTimeout {
+				shouldDelete = true
+			}
 		}
 
 		if shouldDelete {
